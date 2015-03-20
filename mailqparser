@@ -28,6 +28,7 @@ def multiline_split(iterator, pattern='^$'):
             else:
                 block += line
         except StopIteration:
+            yield block
             break
 
 
