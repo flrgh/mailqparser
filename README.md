@@ -23,6 +23,11 @@ Into something more useful for machine consumption, like this:
 C5B34D4ACEFC;somebodythatiusedtoknow@woot.com;god@heaven.io
 ```
 
+That is:
+
+```
+<queue id>;<sender>;<comma-delimited list of recipients>
+```
 But wait, it can filter output based on a provided regular expression too!
 
 ```
