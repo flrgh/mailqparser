@@ -36,7 +36,7 @@ def parse_blocks(blocks):
     '''Parses entries in the mailq and returns the postfix id, sender,
     and recipient of the message
     '''
-    pattern = r"""
+    regex = re.compile(r"""
         (?P<id>[A-Z0-9]+)             # mail queue id
         \*?                           # asterisk if message is in the active queue
         \s+
@@ -47,11 +47,15 @@ def parse_blocks(blocks):
         (?P<stamp>\d\d:\d\d:\d\d)     # timestamp (e.g. 10:12:28)
         \s+
         (?P<sender>.*)             # sender
-    """
-    regex = re.compile(pattern, re.VERBOSE)
+    """, re.VERBOSE)
+    head_pattern = re.compile(r"""-Queue ID- --Size-- ----Arrival Time---- -Sender/Recipient-------""")
+    head_seen = False
     for block in blocks:
         mailq_item = {}
         data = block.strip('\n').split('\n')
+        if not head_seen and head_pattern.match(data[0]):
+            data = data[1:]
+            head_seen = True
         header = regex.match(data[0])
         if not header:
             continue
