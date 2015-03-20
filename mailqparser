@@ -1,0 +1,176 @@
+#!/usr/bin/env python
+
+from __future__ import with_statement
+import argparse
+import re
+import sys
+
+
+'''A tool for parsing the output of mailq/postqueue -p/sendmail -bp'''
+
+
+def multiline_split(iterator, pattern='^$'):
+    '''Splits multiline text based on a provided regex and returns the
+    result as a generator. When reading from stdin, this turns out to be much
+    more efficient than doing something like this:
+    
+    re.split('^$', text, re.MULTILINE)
+    '''
+    block = ''
+    regex = re.compile(pattern)
+    while True:
+        try:
+            line = iterator.next()
+            if regex.match(line):
+                if len(block) > 0:
+                    yield block
+                block = ''
+            else:
+                block += line
+        except StopIteration:
+            break
+
+
+def parse_blocks(blocks):
+    '''Parses entries in the mailq and returns the postfix id, sender,
+    and recipient of the message
+    '''
+    pattern = r"""
+        (?P<id>[A-Z0-9]+)             # mail queue id
+        \*?                           # asterisk if message is in the active queue
+        \s+
+        (?P<size>\d+)                 # message size
+        \s+
+        (?P<date>\w{3}\s\w{3}\s\d\d)  # date stamp (e.g. Sat Mar 14)
+        \s
+        (?P<stamp>\d\d:\d\d:\d\d)     # timestamp (e.g. 10:12:28)
+        \s+
+        (?P<sender>.*)             # sender
+    """
+    regex = re.compile(pattern, re.VERBOSE)
+    for block in blocks:
+        mailq_item = {}
+        data = block.strip('\n').split('\n')
+        header = regex.match(data[0])
+        if not header:
+            continue
+        mailq_item['id'] = header.group('id')
+        mailq_item['size'] = header.group('size')
+        mailq_item['sender'] = header.group('sender')
+        mailq_item['recipient'] = []
+        # Todo: parse date/stamp and add mailq_item['stamp'] as a datetime
+        # object
+        for line in data[1:]:
+            line = line.strip()
+            # Each entry in the mail queue may or may not have an error or
+            # reason it's deferred. This is always in parens
+            if line.startswith('(') and line.endswith(')'):
+                mailq_item['error'] = line
+            else:
+                mailq_item['recipient'].append(line)
+        yield mailq_item
+
+
+def read_pattern_file(fname):
+    '''Reads a file and returns a regex object'''
+    with open(fname, 'r') as fp:
+        pattern = '|'.join(line.strip() for line in fp)
+        pattern = pattern.strip('|\n\t ')
+        return re.compile(pattern)
+
+
+def pattern_match(regex, queue_item, mode='any', inverse=False):
+    '''Given a regex and a queue_item (a dict), returns True or False based on
+    if the messages sender/recipients match the regex.
+
+    Kwargs
+        mode: choices ['any', 'from', 'to']. Match on both the
+              sender/recipient or just one of the two
+        inverse: if True, return True only if there is no match
+    '''
+    sender_match = lambda x: bool(regex.search(x['sender']))
+    recipient_match = lambda x: any(map(regex.search, x['recipient']))
+
+    if mode == 'from':
+        found_match = sender_match(queue_item)
+    elif mode == 'to':
+        found_match = recipient_match(queue_item)
+    else:
+        found_match = any((
+                           sender_match(queue_item),
+                           recipient_match(queue_item)
+                           ))
+    return found_match ^ inverse
+        
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(
+        usage='%(prog)s [OPTIONS]'
+    )
+    parser.add_argument(
+        '-p', '--print',
+        dest='print_action',
+        action='store_true',
+        default=True,
+        help='Print messages matching the filter',
+    )
+    parser.add_argument(
+        '-v',
+        dest='inverse',
+        action='store_true',
+        default=False,
+        help='Invert the match (like "grep -v")',
+    )
+    parser.add_argument(
+        '-m', '--match',
+        dest='match',
+        choices=['any','from','to'],
+        default='any',
+        help='Match against sender or recipient (default both)'
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '-f', '--file',
+        dest='pattern_file',
+        help='Filename to use for patterns',
+    )
+    group.add_argument(
+        '-r', '--regex',
+        dest='pattern',
+        help='Regular expression to match queue items against'
+    )
+
+    args = parser.parse_args()
+
+    if args.pattern_file:
+        try:
+            regex = read_pattern_file(args.pattern_file)
+        except IOError:
+            print "You dingus, your pattern file ({0}) does not exist or isn't readable".format(args.pattern_file)
+            exit(1)
+    elif args.pattern:
+        regex = re.compile(args.pattern)
+    else:
+        regex = None
+
+    stdin_lines = (line for line in sys.stdin)
+    split_data = multiline_split(stdin_lines)
+    parsed = parse_blocks(split_data)
+    filtered = parsed
+    if regex:
+        filtered = (q for q in filtered if pattern_match(regex, q,
+                                                         mode=args.match,
+                                                         inverse=args.inverse))
+    DELIM = ';'
+    # A try-except block is necessary here in order to handle ctrl-c or a pipe
+    # closure when we pipe stdout to another script/tool
+    try:
+        for mailq in filtered:
+            outstring = DELIM.join((mailq['id'],
+                                    mailq['sender'],
+                                    ','.join(mailq['recipient'])
+                                  )) + '\n'
+            sys.stdout.write(outstring)
+    except (IOError, KeyboardInterrupt):
+        exit(0)
