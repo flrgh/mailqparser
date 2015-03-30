@@ -13,7 +13,7 @@ def multiline_split(iterator, pattern='^$'):
     '''Splits multiline text based on a provided regex and returns the
     result as a generator. When reading from stdin, this turns out to be much
     more efficient than doing something like this:
-    
+
     re.split('^$', text, re.MULTILINE)
     '''
     block = ''
@@ -61,8 +61,9 @@ def parse_blocks(blocks):
             continue
         mailq_item['id'] = header.group('id')
         mailq_item['size'] = header.group('size')
-        mailq_item['sender'] = header.group('sender')
-        mailq_item['recipient'] = []
+        mailq_item['from'] = header.group('sender')
+        mailq_item['datestring'] = ' '.join((header.group('date'), header.group('stamp')))
+        mailq_item['to'] = []
         # Todo: parse date/stamp and add mailq_item['stamp'] as a datetime
         # object
         for line in data[1:]:
@@ -72,7 +73,7 @@ def parse_blocks(blocks):
             if line.startswith('(') and line.endswith(')'):
                 mailq_item['error'] = line
             else:
-                mailq_item['recipient'].append(line)
+                mailq_item['to'].append(line)
         yield mailq_item
 
 
@@ -96,8 +97,8 @@ def pattern_match(regex, queue_item, mode='any', inverse=False):
               sender/recipient or just one of the two
         inverse: if True, return True only if there is no match
     '''
-    sender_match = lambda x: bool(regex.search(x['sender']))
-    recipient_match = lambda x: any(map(regex.search, x['recipient']))
+    sender_match = lambda x: bool(regex.search(x['from']))
+    recipient_match = lambda x: any(map(regex.search, x['to']))
 
     if mode == 'from':
         found_match = sender_match(queue_item)
@@ -109,7 +110,19 @@ def pattern_match(regex, queue_item, mode='any', inverse=False):
                            recipient_match(queue_item)
                            ))
     return found_match ^ inverse
-        
+
+
+def format_output(mailq_item, delim, format_string):
+    '''Helper function for formatting data in a mailq_item dict'''
+
+    def fmt(item):
+        val = mailq_item.get(item, '')
+        val = ','.join(val) if isinstance(val, list) else val
+        return val
+
+    data = map(fmt, format_string.split(','))
+    return delim.join(data)
+
 
 if __name__ == '__main__':
 
@@ -117,11 +130,17 @@ if __name__ == '__main__':
         usage='%(prog)s [OPTIONS]'
     )
     parser.add_argument(
-        '-p', '--print',
-        dest='print_action',
-        action='store_true',
-        default=True,
-        help='Print messages matching the filter (default)',
+        '-p', '--print-format',
+        dest='print_format',
+        default='id,from,to',
+        help='''Comma-delimited list of output fields and order. Fields \
+available: id, from, to, datestring, size, error. Default is "id,from,to"''',
+    )
+    parser.add_argument(
+        '-d', '--delim',
+        dest='delim',
+        default=';',
+        help='Output field separator to use (default is a semicolon)'
     )
     parser.add_argument(
         '-v',
@@ -135,7 +154,7 @@ if __name__ == '__main__':
         dest='match',
         choices=['any','from','to'],
         default='any',
-        help='Match against sender or recipient (default both)'
+        help='Match against sender or recipient (default any)'
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -175,15 +194,11 @@ and removed. Are you sure you typed your pattern in correctly?\n'''
         filtered = (q for q in filtered if pattern_match(regex, q,
                                                          mode=args.match,
                                                          inverse=args.inverse))
-    DELIM = ';'
     # A try-except block is necessary here in order to handle ctrl-c or a pipe
     # closure when we pipe stdout to another script/tool
     try:
         for mailq in filtered:
-            outstring = DELIM.join((mailq['id'],
-                                    mailq['sender'],
-                                    ','.join(mailq['recipient'])
-                                  )) + '\n'
-            sys.stdout.write(outstring)
+            outstring = format_output(mailq, args.delim, args.print_format)
+            sys.stdout.write(outstring + '\n')
     except (IOError, KeyboardInterrupt):
         exit(0)

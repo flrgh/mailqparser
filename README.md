@@ -8,7 +8,7 @@ $ mailq
 3F8C6D4AC616*   18059 Tue Mar 17 19:08:03  MAILER-DAEMON
                                            foo@bar.com
                                            friendoffoo@bar.com
-                                           
+
 252CED43D8C5   31669 Tue Mar 17 06:48:32  MAILER-DAEMON
                                           yoohoo@tootles.com
 
@@ -30,16 +30,19 @@ That is:
 ```
 <queue id>;<sender>;<comma-delimited list of recipients>
 ```
-But wait, it can filter output based on a provided regular expression too!
+
+Use the ```-p|--print-format``` and ```-d|--delim``` options to adjust how data is ultimately presented.
+
+You can also filter output based on a provided regular expression:
 
 ```
 $ mailq | mailqparser -r 'foo@.*'
 3F8C6D4AC616;MAILER-DAEMON;foo@bar.com,friendoffoo@bar.com
 3FDCAD4BC871;foo@baz.com;superfunguy@doodeedoo.net
 ```
-* Use the -f <filename> option to toss it a file chock full of patterns to match against any of them
-* Use the -v option to invert the match (you know you want to!)
-* By default we'll match either the sender or recipient(s). Specify either to or from with the -m option if you want to restrict this.
+* Use the ```-f <filename>``` option to toss it a newline-separated filer of patterns to match against any of them
+* Use the ```-v``` flag to invert the match
+* By default we'll match either the sender or recipient(s). Specify either to or from with the ```-m <fieldname>``` if you want to restrict this.
 
 
 ```
@@ -48,10 +51,15 @@ usage: mailqparser [OPTIONS]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p, --print           Print messages matching the filter (default)
+  -p PRINT_FORMAT, --print-format PRINT_FORMAT
+                        Comma-delimited list of output fields and order.
+                        Fields available: id, from, to, datestring, size,
+                        error. Default is "id,from,to"
+  -d DELIM, --delim DELIM
+                        Output field separator to use (default is a semicolon)
   -v                    Invert the match (like "grep -v")
   -m {any,from,to}, --match {any,from,to}
-                        Match against sender or recipient (default both)
+                        Match against sender or recipient (default any)
   -f PATTERN_FILE, --file PATTERN_FILE
                         Filename to use for patterns
   -r PATTERN, --regex PATTERN
