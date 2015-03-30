@@ -81,6 +81,9 @@ def read_pattern_file(fname):
     with open(fname, 'r') as fp:
         pattern = '|'.join(line.strip() for line in fp)
         pattern = pattern.strip('|\n\t ')
+        if pattern == '':
+            print "ERROR: Empty pattern file specified."
+            exit(1)
         return re.compile(pattern)
 
 
@@ -155,6 +158,11 @@ if __name__ == '__main__':
             print "You dingus, your pattern file ({0}) does not exist or isn't readable".format(args.pattern_file)
             exit(1)
     elif args.pattern:
+        if args.pattern.endswith('|') or args.pattern.startswith('|'):
+            args.pattern = args.pattern.strip('|')
+            warning = '''WARNING: Leading or trailing pipe character spotted \
+and removed. Are you sure you typed your pattern in correctly?\n'''
+            sys.stderr.write(warning)
         regex = re.compile(args.pattern)
     else:
         regex = None
