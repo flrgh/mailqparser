@@ -31,7 +31,14 @@ That is:
 <queue id>;<sender>;<comma-delimited list of recipients>
 ```
 
-Use the ```-p|--print-format``` and ```-d|--delim``` options to adjust how data is ultimately presented.
+Use the ```-p|--print-format``` and ```-d|--delim``` options to adjust how data is ultimately presented:
+
+```
+$ mailq | mailqparser -p id,size,datestring -d '|'
+3F8C6D4AC616|18059|Tue Mar 17 19:08:03
+252CED43D8C5|31669|Tue Mar 17 06:48:32
+C5B34D4ACEFC|35764|Tue Mar 17 19:10:33
+```
 
 You can also filter output based on a provided regular expression:
 
