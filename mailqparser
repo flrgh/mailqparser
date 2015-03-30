@@ -46,7 +46,7 @@ def parse_blocks(blocks):
         \s
         (?P<stamp>\d\d:\d\d:\d\d)     # timestamp (e.g. 10:12:28)
         \s+
-        (?P<sender>.*)             # sender
+        (?P<sender>.*)                # sender
     """, re.VERBOSE)
     head_pattern = re.compile(r"""-Queue ID- --Size-- ----Arrival Time---- -Sender/Recipient-------""")
     head_seen = False

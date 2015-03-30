@@ -3,6 +3,7 @@ A handy, dandy, tiny parser for the postfix mail queue
 
 Turns the output of `mailq`/`postqueue -p`/`sendmail -bp` from this:
 ```
+$ mailq
 -Queue ID- --Size-- ----Arrival Time---- -Sender/Recipient-------
 3F8C6D4AC616*   18059 Tue Mar 17 19:08:03  MAILER-DAEMON
                                            foo@bar.com
@@ -18,6 +19,7 @@ C5B34D4ACEFC*   35764 Tue Mar 17 19:10:33  somebodythatiusedtoknow@woot.com
 Into something more useful for machine consumption, like this:
 
 ```
+$ mailq | mailqparser
 3F8C6D4AC616;MAILER-DAEMON;foo@bar.com,friendoffoo@bar.com
 252CED43D8C5;MAILER-DAEMON;yoohoo@tootles.com
 C5B34D4ACEFC;somebodythatiusedtoknow@woot.com;god@heaven.io
