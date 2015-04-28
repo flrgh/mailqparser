@@ -5,6 +5,7 @@
 
 
 from __future__ import with_statement
+from datetime import datetime, timedelta
 import argparse
 import re
 import sys
@@ -65,8 +66,6 @@ def parse_blocks(blocks):
         mailq_item['from'] = header.group('sender')
         mailq_item['datestring'] = ' '.join((header.group('date'), header.group('stamp')))
         mailq_item['to'] = []
-        # Todo: parse date/stamp and add mailq_item['stamp'] as a datetime
-        # object
         for line in data[1:]:
             line = line.strip()
             # Each entry in the mail queue may or may not have an error or
@@ -76,6 +75,17 @@ def parse_blocks(blocks):
             else:
                 mailq_item['to'].append(line)
         yield mailq_item
+
+
+def parse_date(datestring):
+    '''Returns a datetime object given a datestring of format %a %b %d %H:%M:%S'''
+    today = datetime.now()
+    this_year = ' '.join((datestring, str(today.year)))
+    last_year = ' '.join((datestring, str(today.year - 1)))
+    if datetime.strptime(this_year, '%c') < today:
+        return datetime.strptime(this_year, '%c')
+    else:
+        return datetime.strptime(last_year, '%c')
 
 
 def read_pattern_file(fname):
@@ -113,6 +123,37 @@ def pattern_match(regex, queue_item, mode='any', inverse=False):
     return found_match ^ inverse
 
 
+def timefilter_spec(t):
+    '''Ensures a user-specified time filter is valid and returns a
+    timedelta object if it is'''
+    regex = re.compile('^[+-]?\d+[MmHhDdSs]$')
+    if not regex.match(t):
+        msg = '"{}" is not a valid time filter spec'.format(t)
+        raise argparse.ArgumentTypeError(msg)
+
+    num, units = int(t[:-1]), t[-1].lower()
+
+    if units == 'm':
+        num = num * 60
+    elif units == 'h':
+        num = num * 60 * 60
+    elif units == 'd':
+        num = num * 60 * 60 * 24
+
+    return timedelta(seconds=num)
+
+
+def time_match(mailq_item, time_filter, now):
+    '''Determines if a given item matches the user's time filter'''
+
+    mqdate = parse_date(mailq_item['datestring'])
+    delta = now - mqdate
+
+    if time_filter.total_seconds() < 0:
+        return delta < -time_filter
+    return delta > time_filter
+
+
 def format_output(mailq_item, delim, format_string):
     '''Helper function for formatting data in a mailq_item dict'''
 
@@ -142,6 +183,12 @@ available: id, from, to, datestring, size, error. Default is "id,from,to"''',
         dest='delim',
         default=';',
         help='Output field separator to use (default is a semicolon)'
+    )
+    parser.add_argument(
+        '-t', '--time',
+        dest='tfilter',
+        type=timefilter_spec,
+        help='Filter messages based on age (e.g. "-t=+1d" or "-t=-10m")'
     )
     parser.add_argument(
         '-v',
@@ -195,6 +242,10 @@ and removed. Are you sure you typed your pattern in correctly?\n'''
         filtered = (q for q in filtered if pattern_match(regex, q,
                                                          mode=args.match,
                                                          inverse=args.inverse))
+    if args.tfilter:
+        now = datetime.now()
+        filtered = (q for q in filtered if time_match(q, args.tfilter, now))
+
     # A try-except block is necessary here in order to handle ctrl-c or a pipe
     # closure when we pipe stdout to another script/tool
     try:
