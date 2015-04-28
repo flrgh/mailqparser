@@ -51,7 +51,7 @@ $ mailq | mailqparser -r 'foo@.*'
 * Use the ```-v``` flag to invert the match
 * By default we'll match either the sender or recipient(s). Specify either to or from with the ```-m <fieldname>``` if you want to restrict this.
 
-* Use the -t/--time arguments to filter based on message age
+* Use the --newer-than/--older-than filters to restrict output on message age
 
 ```
 $ mailqparser --help
@@ -65,8 +65,12 @@ optional arguments:
                         error. Default is "id,from,to"
   -d DELIM, --delim DELIM
                         Output field separator to use (default is a semicolon)
-  -t TFILTER, --time TFILTER
-                        Filter messages based on age (e.g. "-t=+1d" or "-t=-10m")
+  -n NEWER_THAN, --newer-than NEWER_THAN
+                        Filter messages newer than... (e.g. "-n 1d" or "-n
+                        40m")
+  -o OLDER_THAN, --older-than OLDER_THAN
+                        Filter messages older than... (e.g. "-n 1d" or "-n
+                        40m")
   -v                    Invert the match (like "grep -v")
   -m {any,from,to}, --match {any,from,to}
                         Match against sender or recipient (default any)

@@ -124,9 +124,9 @@ def pattern_match(regex, queue_item, mode='any', inverse=False):
 
 
 def timefilter_spec(t):
-    '''Ensures a user-specified time filter is valid and returns a
-    timedelta object if it is'''
-    regex = re.compile('^[+-]?\d+[MmHhDdSs]$')
+    '''Ensures a user-specified time filter is valid and returns the total
+     time in seconds'''
+    regex = re.compile('^\d+[MmHhDdSs]$')
     if not regex.match(t):
         msg = '"{}" is not a valid time filter spec'.format(t)
         raise argparse.ArgumentTypeError(msg)
@@ -140,18 +140,20 @@ def timefilter_spec(t):
     elif units == 'd':
         num = num * 60 * 60 * 24
 
-    return timedelta(seconds=num)
+    return num
 
 
-def time_match(mailq_item, time_filter, now):
+def time_match(mailq_item, time_filter, now, mode='newer'):
     '''Determines if a given item matches the user's time filter'''
 
     mqdate = parse_date(mailq_item['datestring'])
     delta = now - mqdate
 
-    if time_filter.total_seconds() < 0:
-        return delta < -time_filter
-    return delta > time_filter
+    age = (delta.days * 60 * 60 * 24) + delta.seconds
+    if mode == 'newer':
+        return age < time_filter
+    else:
+        return age > time_filter
 
 
 def format_output(mailq_item, delim, format_string):
@@ -185,10 +187,16 @@ available: id, from, to, datestring, size, error. Default is "id,from,to"''',
         help='Output field separator to use (default is a semicolon)'
     )
     parser.add_argument(
-        '-t', '--time',
-        dest='tfilter',
+        '-n', '--newer-than',
+        dest='newer_than',
         type=timefilter_spec,
-        help='Filter messages based on age (e.g. "-t=+1d" or "-t=-10m")'
+        help='Filter messages newer than... (e.g. "-n 1d" or "-n 40m")'
+    )
+    parser.add_argument(
+        '-o', '--older-than',
+        dest='older_than',
+        type=timefilter_spec,
+        help='Filter messages older than... (e.g. "-n 1d" or "-n 40m")'
     )
     parser.add_argument(
         '-v',
@@ -216,6 +224,7 @@ available: id, from, to, datestring, size, error. Default is "id,from,to"''',
         help='Regular expression to match queue items against'
     )
 
+
     args = parser.parse_args()
 
     if args.pattern_file:
@@ -242,9 +251,16 @@ and removed. Are you sure you typed your pattern in correctly?\n'''
         filtered = (q for q in filtered if pattern_match(regex, q,
                                                          mode=args.match,
                                                          inverse=args.inverse))
-    if args.tfilter:
+    if args.newer_than:
         now = datetime.now()
-        filtered = (q for q in filtered if time_match(q, args.tfilter, now))
+        filtered = (q for q in filtered if time_match(q,
+                                                      args.newer_than,
+                                                      now, mode='newer'))
+    if args.older_than:
+        now = datetime.now()
+        filtered = (q for q in filtered if time_match(q,
+                                                      args.older_than,
+                                                      now, mode='older'))
 
     # A try-except block is necessary here in order to handle ctrl-c or a pipe
     # closure when we pipe stdout to another script/tool
