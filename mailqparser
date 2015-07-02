@@ -108,18 +108,16 @@ def pattern_match(regex, queue_item, mode='any', inverse=False):
               sender/recipient or just one of the two
         inverse: if True, return True only if there is no match
     '''
-    sender_match = lambda x: bool(regex.search(x['from']))
-    recipient_match = lambda x: any(map(regex.search, x['to']))
+    sender_match = bool(regex.search(queue_item['from']))
+    recipient_match = any(map(regex.search, queue_item['to']))
 
     if mode == 'from':
-        found_match = sender_match(queue_item)
+        found_match = sender_match
     elif mode == 'to':
-        found_match = recipient_match(queue_item)
+        found_match = recipient_match
     else:
-        found_match = any((
-                           sender_match(queue_item),
-                           recipient_match(queue_item)
-                           ))
+        found_match = sender_match or recipient_match
+
     return found_match ^ inverse
 
 
