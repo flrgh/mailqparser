@@ -9,6 +9,7 @@ from datetime import datetime
 import argparse
 import re
 import sys
+import time
 
 
 def multiline_split(iterator, pattern='^$'):
@@ -94,8 +95,7 @@ def read_pattern_file(fname):
         pattern = '|'.join(line.strip() for line in fp)
         pattern = pattern.strip('|\n\t ')
         if pattern == '':
-            print "ERROR: Empty pattern file specified."
-            exit(1)
+            show_error("ERROR: Empty pattern file specified.", exit=True)
         return re.compile(pattern)
 
 
@@ -166,6 +166,24 @@ def format_output(mailq_item, delim, format_string):
     return delim.join(data)
 
 
+def show_error(msg, exit=False):
+    '''Utility function that prints a message to stderr and sleeps for a short
+    duration to give the user a chance to see the message before they're
+    blasted with the wall of text that is mailqparser's output (also giving
+    them time to Ctrl+C out.
+
+    Kwargs:
+        exit: If true, we'll just exit(1) instead of sleeping'''
+
+    sys.stderr.write(msg + '\n')
+    if exit: sys.exit(1)
+    try:
+        time.sleep(2)
+    except KeyboardInterrupt:
+        sys.exit(1)
+    return
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
@@ -229,14 +247,15 @@ available: id, from, to, datestring, size, error. Default is "id,from,to"''',
         try:
             regex = read_pattern_file(args.pattern_file)
         except IOError:
-            print "You dingus, your pattern file ({0}) does not exist or isn't readable".format(args.pattern_file)
-            exit(1)
+            msg = '''You dingus, your pattern file ({0}) does not exist or \
+isn't readable'''.format(args.pattern_file)
+            show_error(msg, exit=True)
     elif args.pattern:
         if args.pattern.endswith('|') or args.pattern.startswith('|'):
             args.pattern = args.pattern.strip('|')
             warning = '''WARNING: Leading or trailing pipe character spotted \
-and removed. Are you sure you typed your pattern in correctly?\n'''
-            sys.stderr.write(warning)
+and removed. Are you sure you typed your pattern in correctly?'''
+            show_error(warning)
         regex = re.compile(args.pattern)
     else:
         regex = None
@@ -267,4 +286,4 @@ and removed. Are you sure you typed your pattern in correctly?\n'''
             outstring = format_output(mailq, args.delim, args.print_format)
             sys.stdout.write(outstring + '\n')
     except (IOError, KeyboardInterrupt):
-        exit(0)
+        sys.exit(0)
