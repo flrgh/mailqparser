@@ -47,11 +47,11 @@ $ mailq | mailqparser -r 'foo@.*'
 3F8C6D4AC616;MAILER-DAEMON;foo@bar.com,friendoffoo@bar.com
 3FDCAD4BC871;foo@baz.com;superfunguy@doodeedoo.net
 ```
-* Use the ```-f <filename>``` option to toss it a newline-separated filer of patterns to match against any of them
+* Use the ```-f <filename>``` option to toss it a newline-separated file of patterns to match against any of them
 * Use the ```-v``` flag to invert the match
 * By default we'll match either the sender or recipient(s). Specify either to or from with the ```-m <fieldname>``` if you want to restrict this.
 
-* Use the --newer-than/--older-than filters to restrict output on message age
+* Use the ```--newer-than|-n``` and ```--older-than|-o``` filters to restrict output on message age
 
 ```
 $ mailqparser --help
